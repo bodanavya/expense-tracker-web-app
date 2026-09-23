@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ledger — Expense Tracker</title>
+<style>
+:root{
+  --bg:#0F2A22; --panel:#153A2E; --paper:#F4EFE3; --ink:#1B1B18;
+  --gold:#C9A227; --line:#2A5044; --red:#B8503F; --muted:#8FAE9F;
+}
+*{box-sizing:border-box}
+html{min-height:100%;scroll-behavior:smooth}
+body{margin:0;min-height:100vh;background:var(--bg);color:var(--paper);
+  font-family:'Iowan Old Style','Georgia',serif;padding:28px 16px 50px}
+.sheet{width:100%;max-width:760px;margin:auto}
+header{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid var(--gold);
+  padding-bottom:14px;margin-bottom:20px;gap:12px}
+h1{font-size:28px;margin:0;font-weight:600}.title-accent{color:var(--gold)}
+.date{font:12px 'Courier New',monospace;color:var(--muted);text-align:right}
+.toolbar{display:flex;gap:8px;margin-bottom:18px;justify-content:flex-end}
+.small-btn{background:transparent;color:var(--paper);border:1px solid var(--line);padding:8px 11px;border-radius:4px;
+  font:12px inherit;cursor:pointer}.small-btn:hover{border-color:var(--gold)}
+.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:16px}
+.card .label{font-size:11px;color:var(--muted);margin-bottom:5px}
+.card .value{font:700 21px 'Courier New',monospace}
+.income{color:var(--gold)}.expense{color:var(--red)}.balance{color:var(--gold)}
+form{background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:18px;margin-bottom:22px;
+  display:grid;grid-template-columns:2fr 1fr;gap:10px}
+.full{grid-column:1/-1}label{font-size:11px;color:var(--muted);display:block;margin-bottom:4px}
+input,select{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--paper);padding:10px;
+  border-radius:3px;font-family:inherit;font-size:14px}
+input:focus,select:focus,button:focus-visible{outline:2px solid var(--gold);outline-offset:1px}
+.submit{grid-column:1/-1;background:var(--gold);color:var(--ink);border:0;padding:11px;border-radius:3px;
+  font-weight:700;font-family:inherit;cursor:pointer}.submit:hover{filter:brightness(1.08)}
+.section-title{font-size:13px;color:var(--muted);margin:20px 0 10px;font-weight:600}
+.entries{list-style:none;margin:0;padding:0}
+.entries li{display:grid;grid-template-columns:1fr auto auto auto;gap:10px;align-items:center;padding:13px 4px;
+  border-bottom:1px solid var(--line)}
+.desc{font-size:15px}.cat{font:11px 'Courier New',monospace;color:var(--muted);display:block;margin-top:3px}
+.when{font:10px 'Courier New',monospace;color:var(--muted)}
+.amt{font:15px 'Courier New',monospace;text-align:right;min-width:90px}
+.actions{display:flex;gap:3px}.icon-btn{background:none;border:0;color:var(--muted);font-size:17px;cursor:pointer;padding:3px 6px}
+.icon-btn:hover{color:var(--gold)}.delete:hover{color:var(--red)}
+.empty{text-align:center;color:var(--muted);padding:28px 10px;font-size:14px;border:0!important;display:block!important}
+.breakdown{margin-top:25px}.bar-row{margin-bottom:11px}.top{display:flex;justify-content:space-between;
+  font:12px 'Courier New',monospace;margin-bottom:4px}.bar-track{height:7px;background:var(--line);border-radius:4px;overflow:hidden}
+.bar-fill{height:100%;background:var(--gold)}
+.chart-box{background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:15px;margin-top:12px}
+canvas{width:100%;height:190px;display:block}
+.notice{font-size:11px;color:var(--muted);margin-top:8px}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.62);display:none;align-items:center;justify-content:center;padding:20px;z-index:5}
+.modal.show{display:flex}.modal-card{width:100%;max-width:420px;background:var(--panel);border:1px solid var(--line);
+  border-radius:6px;padding:18px}.modal-card h2{margin:0 0 14px;font-size:18px}.modal-actions{display:flex;gap:8px;margin-top:12px}
+.secondary{background:transparent;color:var(--paper);border:1px solid var(--line);padding:10px;border-radius:3px;cursor:pointer}
+.danger{background:var(--red);color:white;border:0;padding:10px;border-radius:3px;cursor:pointer}
+@media(max-width:600px){
+  body{padding:20px 12px 40px}.summary{grid-template-columns:1fr}.entries li{grid-template-columns:1fr auto}
+  .when{grid-column:1}.amt{grid-column:2;grid-row:1/3}.actions{grid-column:1}
+  form{grid-template-columns:1fr}.full,.submit{grid-column:1}
+  header{align-items:flex-start}.date{max-width:130px}
+}
+@media(prefers-color-scheme:light){
+  :root:not([data-theme="dark"]){--bg:#EDE6D6;--panel:#FBF8F0;--paper:#1B1B18;--ink:#F4EFE3;--line:#DCD3BC;--muted:#7A7160}
+}
+:root[data-theme="light"]{--bg:#EDE6D6;--panel:#FBF8F0;--paper:#1B1B18;--ink:#F4EFE3;--line:#DCD3BC;--muted:#7A7160}
+</style>
+</head>
+<body>
+<div class="sheet">
+<header>
+  <h1>Ledger <span class="title-accent">Book</span></h1>
+  <div class="date" id="today"></div>
+</header>
+
+<div class="toolbar">
+  <button class="small-btn" id="themeBtn">☀️ Light</button>
+  <button class="small-btn" id="exportBtn">Export CSV</button>
+  <button class="small-btn" id="clearBtn">Clear all</button>
+</div>
+
+<section class="summary">
+  <div class="card"><div class="label">Current balance</div><div class="value balance" id="balance">₹0.00</div></div>
+  <div class="card"><div class="label">Total income</div><div class="value income" id="income">₹0.00</div></div>
+  <div class="card"><div class="label">Total expenses</div><div class="value expense" id="expenses">₹0.00</div></div>
+</section>
+
+<form id="entry-form">
+  <div class="full"><label for="desc">What was it?</label><input id="desc" type="text" placeholder="Coffee, textbook, rent…" required></div>
+  <div><label for="amount">Amount (₹)</label><input id="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required></div>
+  <div><label for="type">Type</label><select id="type"><option value="expense">Expense</option><option value="income">Income</option></select></div>
+  <div><label for="category">Category</label><select id="category"><option>Food</option><option>Transport</option><option>Housing</option><option>School</option><option>Fun</option><option>Other</option></select></div>
+  <div><label for="date">Date</label><input id="date" type="date" required></div>
+  <button class="submit" id="submitBtn" type="submit">Add entry</button>
+</form>
+
+<div class="section-title">Transactions</div>
+<ul class="entries" id="entries"></ul>
+
+<div class="breakdown" id="breakdown"></div>
+<div class="chart-box" id="chartBox" style="display:none">
+  <div class="section-title" style="margin-top:0">Monthly spending</div>
+  <canvas id="chart"></canvas>
+  <div class="notice">Expenses grouped by month.</div>
+</div>
+</div>
+
+<div class="modal" id="editModal">
+  <div class="modal-card">
+    <h2>Edit transaction</h2>
+    <input type="hidden" id="editIdx">
+    <label>Description</label><input id="editDesc">
+    <br><br>
+    <label>Amount (₹)</label><input id="editAmount" type="number" min="0.01" step="0.01">
+    <br><br>
+    <label>Type</label><select id="editType"><option value="expense">Expense</option><option value="income">Income</option></select>
+    <br><br>
+    <label>Category</label><select id="editCategory"><option>Food</option><option>Transport</option><option>Housing</option><option>School</option><option>Fun</option><option>Other</option></select>
+    <br><br>
+    <label>Date</label><input id="editDate" type="date">
+    <div class="modal-actions"><button class="submit" id="saveEdit" type="button">Save changes</button><button class="secondary" id="cancelEdit" type="button">Cancel</button></div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY='ledger-entries-v2';
+let entries=[];
+try{entries=JSON.parse(localStorage.getItem(STORAGE_KEY))||[]}catch(e){entries=[]}
+
+const $=id=>document.getElementById(id);
+const today=new Date();
+const iso=d=>{const x=new Date(d);return new Date(x.getTime()-x.getTimezoneOffset()*60000).toISOString().slice(0,10)};
+$('date').value=iso(today);
+$('today').textContent=today.toLocaleDateString(undefined,{month:'long',day:'numeric',year:'numeric'});
+
+function save(){localStorage.setItem(STORAGE_KEY,JSON.stringify(entries))}
+function fmt(n){return '₹'+Number(n).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}
+function escapeHtml(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+
+function render(){
+ const income=entries.filter(e=>e.type==='income').reduce((s,e)=>s+e.amount,0);
+ const expenses=entries.filter(e=>e.type==='expense').reduce((s,e)=>s+e.amount,0);
+ const balance=income-expenses;
+ $('income').textContent=fmt(income); $('expenses').textContent=fmt(expenses); $('balance').textContent=fmt(balance);
+
+ const list=$('entries'); list.innerHTML='';
+ if(!entries.length){list.innerHTML='<li class="empty">No entries yet — add your first one above.</li>'}
+ else [...entries].map((e,i)=>({e,i})).reverse().forEach(({e,i})=>{
+   const li=document.createElement('li');
+   li.innerHTML=`<div><div class="desc">${escapeHtml(e.desc)}</div><span class="cat">${escapeHtml(e.category)}</span></div>
+   <div class="when">${new Date(e.date+'T00:00:00').toLocaleDateString(undefined,{day:'2-digit',month:'short',year:'numeric'})}</div>
+   <div class="amt" style="color:${e.type==='income'?'var(--gold)':'var(--red)'}">${e.type==='income'?'+':'-'}${fmt(e.amount)}</div>
+   <div class="actions"><button class="icon-btn edit" data-i="${i}" title="Edit">✎</button><button class="icon-btn delete" data-i="${i}" title="Delete">×</button></div>`;
+   list.appendChild(li);
+ });
+ renderBreakdown(); renderChart();
+}
+
+function renderBreakdown(){
+ const cats={};
+ entries.filter(e=>e.type==='expense').forEach(e=>cats[e.category]=(cats[e.category]||0)+e.amount);
+ const total=Object.values(cats).reduce((a,b)=>a+b,0), b=$('breakdown');
+ if(!total){b.innerHTML='';return}
+ const rows=Object.entries(cats).sort((a,b)=>b[1]-a[1]).map(([cat,amt])=>{
+   const pct=Math.round(amt/total*100);
+   return `<div class="bar-row"><div class="top"><span>${escapeHtml(cat)}</span><span>${fmt(amt)} · ${pct}%</span></div><div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div></div>`;
+ }).join('');
+ b.innerHTML='<div class="section-title">Spending by category</div>'+rows;
+}
+
+function renderChart(){
+ const canvas=$('chart'), box=$('chartBox'), ctx=canvas.getContext('2d');
+ const monthly={};
+ entries.filter(e=>e.type==='expense').forEach(e=>{const m=e.date.slice(0,7);monthly[m]=(monthly[m]||0)+e.amount});
+ const data=Object.entries(monthly).sort().slice(-6);
+ if(!data.length){box.style.display='none';return}
+ box.style.display='block';
+ const w=canvas.clientWidth||600,h=190,dpr=devicePixelRatio||1; canvas.width=w*dpr;canvas.height=h*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);
+ ctx.clearRect(0,0,w,h);
+ const max=Math.max(...data.map(x=>x[1]),1), left=40,bottom=28,top=12,plotH=h-top-bottom,barW=Math.min(48,(w-left-20)/data.length-10);
+ ctx.font='10px Courier New';ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--muted');
+ data.forEach(([m,v],i)=>{
+   const x=left+i*((w-left-15)/data.length)+((w-left-15)/data.length-barW)/2;
+   const bh=v/max*plotH,y=top+plotH-bh;
+   ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--gold');ctx.fillRect(x,y,barW,bh);
+   ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--muted');ctx.textAlign='center';
+   ctx.fillText(m.slice(5),x+barW/2,h-9);ctx.fillText('₹'+Math.round(v),x+barW/2,Math.max(10,y-4));
+ });
+}
+window.addEventListener('resize',renderChart);
+
+$('entry-form').addEventListener('submit',e=>{
+ e.preventDefault();
+ const desc=$('desc').value.trim(),amount=parseFloat($('amount').value);
+ if(!desc||!Number.isFinite(amount)||amount<=0||!$('date').value)return;
+ entries.push({desc,amount,type:$('type').value,category:$('category').value,date:$('date').value});
+ save();render();e.target.reset();$('date').value=iso(new Date());$('desc').focus();
+});
+
+$('entries').addEventListener('click',e=>{
+ const i=Number(e.target.dataset.i);
+ if(e.target.classList.contains('delete')){entries.splice(i,1);save();render()}
+ if(e.target.classList.contains('edit')){
+   const x=entries[i];$('editIdx').value=i;$('editDesc').value=x.desc;$('editAmount').value=x.amount;
+   $('editType').value=x.type;$('editCategory').value=x.category;$('editDate').value=x.date;$('editModal').classList.add('show');
+ }
+});
+$('cancelEdit').onclick=()=>$('editModal').classList.remove('show');
+$('saveEdit').onclick=()=>{
+ const i=Number($('editIdx').value),amount=parseFloat($('editAmount').value);
+ if(!entries[i]||!$('editDesc').value.trim()||!Number.isFinite(amount)||amount<=0)return;
+ entries[i]={desc:$('editDesc').value.trim(),amount,type:$('editType').value,category:$('editCategory').value,date:$('editDate').value};
+ save();render();$('editModal').classList.remove('show');
+};
+
+$('clearBtn').onclick=()=>{
+ if(entries.length&&confirm('Delete all transactions? This cannot be undone.')){entries=[];save();render()}
+};
+$('exportBtn').onclick=()=>{
+ if(!entries.length){alert('No transactions to export.');return}
+ const rows=[['Description','Amount','Type','Category','Date'],...entries.map(e=>[e.desc,e.amount,e.type,e.category,e.date])];
+ const csv=rows.map(r=>r.map(v=>`"${String(v).replaceAll('"','""')}"`).join(',')).join('\\n');
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='ledger-transactions.csv';a.click();URL.revokeObjectURL(a.href);
+};
+const root=document.documentElement;
+function setTheme(t){root.dataset.theme=t;localStorage.setItem('ledger-theme',t);$('themeBtn').textContent=t==='dark'?'☀️ Light':'🌙 Dark'}
+const savedTheme=localStorage.getItem('ledger-theme')||'dark';setTheme(savedTheme);
+$('themeBtn').onclick=()=>setTheme(root.dataset.theme==='dark'?'light':'dark');
+
+render();
+</script>
+</body>
+</html>
